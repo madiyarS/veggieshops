@@ -1,0 +1,295 @@
+openapi: 3.0.3
+info:
+  title: VeggieShops.kz API
+  version: "2.0"
+  description: |
+    Публичные эндпоинты v1 и расширения v2 (пагинация курсором).
+servers:
+  - url: http://localhost:8081
+    description: Docker backend (порт 8081)
+paths:
+  /api/v1/products:
+    get:
+      summary: Каталог товаров магазина (витрина)
+      parameters:
+        - name: store_id
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+        - name: category_id
+          in: query
+          schema: { type: string, format: uuid }
+        - name: q
+          in: query
+          description: Поиск по названию
+          schema: { type: string }
+        - name: in_stock_only
+          in: query
+          description: true — только с остатком и не «временно нет»
+          schema: { type: boolean }
+        - name: sort
+          in: query
+          description: name | price_asc | price_desc | expiry_asc
+          schema: { type: string }
+      responses:
+        "200":
+          description: success, data — массив товаров (stock_quantity = доступно; nearest_batch_expires_at, catalog_low_stock)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessList"
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /api/v1/products/availability:
+    get:
+      summary: Доступный остаток по списку товаров (до 50 id)
+      parameters:
+        - name: store_id
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+        - name: product_ids
+          in: query
+          required: true
+          description: UUID через запятую
+          schema: { type: string }
+      responses:
+        "200":
+          description: success, data — объект { "uuid": количество } (граммы для weight_gram, штуки для piece)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data:
+                    type: object
+                    additionalProperties: { type: integer }
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiError"
+  /api/v1/admin/stores/{storeId}/stock/receive-simple:
+    post:
+      summary: Простой приход на склад (зона зал)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: storeId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [product_id, quantity]
+              properties:
+                product_id: { type: string, format: uuid }
+                quantity: { type: integer, description: шт или граммы }
+                note: { type: string }
+      responses:
+        "201":
+          description: OK
+        "401":
+          description: Нет JWT
+  /api/v1/admin/stores/{storeId}/stock/moves-journal:
+    get:
+      summary: Журнал движений (последние записи)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: storeId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 100 }
+      responses:
+        "200":
+          description: success, data — движения с product_name
+  /api/v1/admin/stores/{storeId}/stock/set-actual:
+    post:
+      summary: Инвентаризация — установить фактический остаток
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: storeId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [product_id, actual]
+              properties:
+                product_id: { type: string, format: uuid }
+                actual: { type: integer }
+                note: { type: string }
+      responses:
+        "200":
+          description: OK
+  /api/v1/health:
+    get:
+      summary: Проверка живости API
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  service: { type: string }
+                  version: { type: string }
+  /api/v2/products:
+    get:
+      summary: Список товаров витрины (keyset по id)
+      parameters:
+        - name: store_id
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50, maximum: 200 }
+        - name: after_id
+          in: query
+          description: Курсор — id последнего товара предыдущей страницы
+          schema: { type: string, format: uuid }
+        - name: category_id
+          in: query
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Список и meta.has_more, meta.next_after_id
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedProductsResponse"
+  /api/v2/admin/stores/{storeId}/orders:
+    get:
+      summary: Заказы магазина (админ, курсор по created_at, id)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: storeId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50 }
+        - name: after_created_at
+          in: query
+          schema: { type: string, format: date-time }
+        - name: after_id
+          in: query
+          schema: { type: string, format: uuid }
+        - name: status
+          in: query
+          schema: { type: string }
+        - name: date_from
+          in: query
+          schema: { type: string }
+        - name: date_to
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Заказы и курсор в meta
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedOrdersResponse"
+        "401":
+          description: Нет или неверный JWT
+  /api/v2/admin/stores/{storeId}/stock/movements:
+    get:
+      summary: Журнал движений склада (курсор)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: storeId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50 }
+        - name: after_created_at
+          in: query
+          schema: { type: string, format: date-time }
+        - name: after_id
+          in: query
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Движения и meta
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedMovementsResponse"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    ApiError:
+      type: object
+      properties:
+        success: { type: boolean, example: false }
+        error: { type: string, description: Текст для пользователя }
+        code:
+          type: string
+          description: Код для поддержки (VALIDATION_ERROR, INSUFFICIENT_STOCK, MIN_ORDER_AMOUNT, …)
+    SuccessList:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          type: array
+          items: { type: object }
+    PagedMeta:
+      type: object
+      properties:
+        has_more: { type: boolean }
+        next_after_id: { type: string, format: uuid }
+        next_after_created_at: { type: string, format: date-time }
+    PagedProductsResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          type: array
+          items: { type: object }
+        meta:
+          $ref: "#/components/schemas/PagedMeta"
+    PagedOrdersResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          type: array
+          items: { type: object }
+        meta:
+          $ref: "#/components/schemas/PagedMeta"
+    PagedMovementsResponse:
+      type: object
+      properties:
+        success: { type: boolean }
+        data:
+          type: array
+          items: { type: object }
+        meta:
+          $ref: "#/components/schemas/PagedMeta"

@@ -1,0 +1,33 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+veggieshops-kz-api
+veggieshop-api
+
+# Test binary
+*.test
+
+# Output
+*.out
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Загруженные картинки товаров
+data/uploads/*
+!data/uploads/.gitkeep

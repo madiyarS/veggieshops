@@ -1,0 +1,22 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Тёмная админка в духе zakazik (оранжевый акцент, slate-поверхности) */
+.admin-root {
+  --admin-bg-base: #0f1117;
+  --admin-bg-surface: #1a1d27;
+  --admin-bg-elevated: #252836;
+  --admin-border: #2e3347;
+  --admin-text-primary: #f1f3f9;
+  --admin-text-muted: #8b93a7;
+  --admin-accent: #ff4d00;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
