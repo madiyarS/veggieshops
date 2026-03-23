@@ -37,9 +37,9 @@ type DatabaseConfig struct {
 
 // JWTConfig holds JWT settings
 type JWTConfig struct {
-	Secret           string
-	AccessTokenExp   int // minutes
-	RefreshTokenExp  int // hours
+	Secret          string
+	AccessTokenExp  int // minutes
+	RefreshTokenExp int // hours
 }
 
 // APIKeysConfig holds external API keys (placeholders for integrations)
@@ -71,26 +71,51 @@ func (c *DatabaseConfig) DSN() string {
 }
 
 // Load loads configuration from environment variables
+// Load loads configuration from environment variables
 func Load() (*Config, error) {
 	// Load .env file if exists (ignore error if not found)
 	_ = godotenv.Load()
 
 	accessExp, _ := strconv.Atoi(getEnv("JWT_ACCESS_EXP", "60"))
-	refreshExp, _ := strconv.Atoi(getEnv("JWT_REFRESH_EXP", "168")) // 168 hours = 7 days
+	refreshExp, _ := strconv.Atoi(getEnv("JWT_REFRESH_EXP", "168"))
 	pendingTimeout, _ := strconv.Atoi(getEnv("PENDING_ORDER_TIMEOUT_MIN", "120"))
 	staleSweep, _ := strconv.Atoi(getEnv("STALE_ORDER_SWEEP_INTERVAL_SEC", "300"))
+
+	// Если DATABASE_URL есть (Railway), используй его напрямую
+	databaseURL := os.Getenv("DATABASE_URL")
+
+	var dbHost, dbPort, dbUser, dbPassword, dbName, dbSSLMode string
+
+	if databaseURL != "" {
+		// Парсим DATABASE_URL (формат: postgresql://user:password@host:port/dbname?sslmode=...)
+		// Для простоты используем дефолты из отдельных переменных если есть
+		dbHost = getEnv("PGHOST", "localhost")
+		dbPort = getEnv("PGPORT", "5432")
+		dbUser = getEnv("PGUSER", "postgres")
+		dbPassword = getEnv("PGPASSWORD", "password")
+		dbName = getEnv("PGDATABASE", "veggies_shop")
+		dbSSLMode = getEnv("PGSSLMODE", "require") // Railway требует SSL
+	} else {
+		// Локальная разработка
+		dbHost = getEnv("DB_HOST", "localhost")
+		dbPort = getEnv("DB_PORT", "5432")
+		dbUser = getEnv("DB_USER", "postgres")
+		dbPassword = getEnv("DB_PASSWORD", "password")
+		dbName = getEnv("DB_NAME", "veggies_shop")
+		dbSSLMode = getEnv("DB_SSLMODE", "disable")
+	}
 
 	cfg := &Config{
 		Server: ServerConfig{
 			Port: getEnv("PORT", "8080"),
 		},
 		Database: DatabaseConfig{
-			Host:     getEnv("DB_HOST", "localhost"),
-			Port:     getEnv("DB_PORT", "5432"),
-			User:     getEnv("DB_USER", "postgres"),
-			Password: getEnv("DB_PASSWORD", "password"),
-			Name:     getEnv("DB_NAME", "veggies_shop"),
-			SSLMode:  getEnv("DB_SSLMODE", "disable"),
+			Host:     dbHost,
+			Port:     dbPort,
+			User:     dbUser,
+			Password: dbPassword,
+			Name:     dbName,
+			SSLMode:  dbSSLMode,
 		},
 		JWT: JWTConfig{
 			Secret:          getEnv("JWT_SECRET", "your-secret-key-change-in-production"),
